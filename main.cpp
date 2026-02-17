@@ -8,7 +8,7 @@
 #define PREVIEW_SIZE 128
 #define MAX_ENEMIES 1024
 #define HAND_SIZE 4
-#define STATUS_BAR_SIZE 100
+#define STATUS_BAR_SIZE 112
 #define MAX_DAMAGE_EVENTS 32
 #define DAMAGE_LINGER_DURATION 1.2f
 #define MAX_PASS_COUNTER 5
@@ -31,6 +31,7 @@ typedef enum {
     ENEMY_VINES,
     ENEMY_CHEST,
     ENEMY_FOOD,
+    ENEMY_POTION,
     ENEMY_NONE
 } EnemyType;
 typedef struct {
@@ -80,7 +81,7 @@ Enemy enemies[MAX_ENEMIES];
 int enemyCount = 0;
 EnemyType hand[HAND_SIZE];
 Player player;
-Texture2D texPlayer, texVampire, texSkeleton, texTroll, texCrate, texVines, texChest, texWall, texFloor, texPillar, texHP, texST, texMP, texTR, texATT, texCard;
+Texture2D texPlayer, texVampire, texSkeleton, texPotion, texTroll, texCrate, texVines, texChest, texWall, texFloor, texPillar, texHP, texST, texMP, texTR, texATT, texCard;
 Font gameFont;
 
 void SpawnDamage(int x, int y, int amount, bool isPlayer) {
@@ -116,12 +117,13 @@ bool EmptyTile(int x, int y) {
 Enemy enemyTemplates[] = {
     {0,0, 8,3,2, 0, true,  true,  ENEMY_VAMPIRE},
     {0,0, 5,5,2, 0, true,  true,  ENEMY_SKELETON},
-    {0,0, 5,0,0,-1, true,  false, ENEMY_WEAPON},
+    {0,0, 1,0,0,-1, true,  false, ENEMY_WEAPON},
     {0,0, 5,0,0, 0, true,  false, ENEMY_CRATE},
     {0,0,12,2,0, 0, true,  true,  ENEMY_TROLL},
     {0,0, 5,2,0, 5, true,  false, ENEMY_VINES},
     {0,0,20,0,5, 0, true,  false, ENEMY_CHEST},
-    {0,0, 3,0,0, 3, true,  false, ENEMY_FOOD},
+    {0,0, 1,0,0, 5, true,  false, ENEMY_FOOD},
+    {0,0, 1,-3,0,0, true,  false, ENEMY_POTION},
 };
 
 Enemy MakeEnemy(EnemyType t, int x, int y) {
@@ -168,6 +170,7 @@ Texture2D GetEnemyTexture(EnemyType t) {
     if(t == ENEMY_VINES) return texVines;
     if(t == ENEMY_CHEST) return texChest;
     if(t == ENEMY_FOOD) return texST;
+    if(t == ENEMY_POTION) return texPotion;
     return texChest;
 }
 
@@ -183,7 +186,6 @@ void TryPlayerMove(int dx, int dy) {
         SpawnDamage(e->x, e->y, dmg, false);
         if(e->hp <= 0) {
             if(e->atk>0) player.fun += 1;
-            e->alive = false;
             player.treasure += e->treasure;
             if(e->food < 0) player.atk += -e->food;
             else player.stamina += e->food;
@@ -201,46 +203,41 @@ void PlayerAutoTurn() {
     // 1. Find nearest alive enemy
     Enemy* target = NULL;
     int bestDist = 9999;
-
-    for(int i = 0; i < enemyCount; i++)
-    {
-        if(!enemies[i].alive) continue;
-
-        int dist = abs(enemies[i].x - player.x) +
-                   abs(enemies[i].y - player.y);
-
-        if(dist < bestDist)
-        {
+    for(int i = 0; i < enemyCount; i++) {
+        if(!enemies[i].alive || enemies[i].atk<=0) continue;
+        int dist = abs(enemies[i].x - player.x) + abs(enemies[i].y - player.y);
+        if(dist < bestDist){
+            bestDist = dist;
+            target = &enemies[i];
+        }
+    }
+    if(bestDist>=2) bestDist *= 2; // prioritize close enough buffs (atk<=0)
+    for(int i = 0; i < enemyCount; i++) {
+        if(!enemies[i].alive || enemies[i].atk>0) continue;
+        int dist = abs(enemies[i].x - player.x) + abs(enemies[i].y - player.y);
+        if(dist < bestDist) {
             bestDist = dist;
             target = &enemies[i];
         }
     }
 
-    if(!target)
-    {
+    if(!target) {
         // optional: random movement when no enemies
         int dx[4] = {1,-1,0,0};
         int dy[4] = {0,0,1,-1};
         int d = GetRandomValue(0,3);
-
         int nx = player.x + dx[d];
         int ny = player.y + dy[d];
-
-        if(EmptyTile(nx,ny))
-        {
+        if(EmptyTile(nx,ny)) {
             player.x = nx;
             player.y = ny;
         }
         return;
     }
 
-
     int dx = target->x - player.x;
     int dy = target->y - player.y;
-
-    // 2. If adjacent → attack
-    if(abs(dx) + abs(dy) == 1)
-    {
+    if(abs(dx) + abs(dy) == 1) {
         int dmg = (player.atk > 0) ? GetRandomValue(1, player.atk) : 0;
         if(player.atk>1 && GetRandomValue(0,99)<10 && !interruptMessage) {
             player.atk--;
@@ -252,7 +249,6 @@ void PlayerAutoTurn() {
         if(target->hp <= 0)
         {
             if(target->atk>0) player.fun += 1;
-            target->alive = false;
             player.treasure += target->treasure;
             if(target->food<0) player.atk += -target->food;
             else player.stamina += target->food;
@@ -300,6 +296,10 @@ void EnemyTurn() {
     for(int i = 0; i < enemyCount; i++) {
         if(!enemies[i].alive)
             continue;
+        if(enemies[i].hp<=0) {
+            enemies[i].hp = 0;
+            enemies[i].alive = 0;
+        }
         if(abs(enemies[i].x - player.x) + abs(enemies[i].y - player.y) == 1 && enemies[i].atk) {
             int dmg = (enemies[i].atk > 0) ? GetRandomValue(1, enemies[i].atk) : 0;
             player.hp -= dmg;
@@ -325,25 +325,51 @@ void EnemyTurn() {
     }
 }
 
-void PlaceEnemyFromHand(int slot)
-{
+void PlaceEnemyFromHand(int slot) {
     if(enemyCount >= MAX_ENEMIES) return;
     if(hand[slot] == ENEMY_NONE) return;
     interruptMessage = nullptr;
     spaceCounter = 0;
-    int x, y;
-    int attempts = 0;
-    do {
-        x = GetRandomValue(1, GRID - 2);
-        y = GetRandomValue(1, GRID - 2);
-        attempts++;
-        if (attempts > 100)
-            return;
-    } while(!EmptyTile(x, y));
+    Enemy def = enemyTemplates[hand[slot]];
+    int x = -1;
+    int y = -1;
+    if(def.hp == 1) {
+        int dx[4] = { 1, -1, 0, 0 };
+        int dy[4] = { 0,  0, 1, -1 };
+        for(int i = 0; i < 4; i++) {
+            int nx = player.x + dx[i];
+            int ny = player.y + dy[i];
+
+            if(EmptyTile(nx, ny)) {
+                x = nx;
+                y = ny;
+                break;
+            }
+        }
+        if(x == -1) {
+            int attempts = 0;
+            do {
+                x = GetRandomValue(1, GRID - 2);
+                y = GetRandomValue(1, GRID - 2);
+                attempts++;
+                if(attempts > 100) return;
+            } while(!EmptyTile(x, y));
+        }
+    }
+    else {
+        int attempts = 0;
+        do {
+            x = GetRandomValue(1, GRID - 2);
+            y = GetRandomValue(1, GRID - 2);
+            attempts++;
+            if(attempts > 100) return;
+        } while(!EmptyTile(x, y));
+    }
     enemies[enemyCount++] = MakeEnemy(hand[slot], x, y);
     for(int i = slot; i < HAND_SIZE - 1; i++)
         hand[i] = hand[i + 1];
     hand[HAND_SIZE - 1] = ENEMY_NONE;
+    if(slot == 0) hand[0] = RandomEnemyType();
 }
 
 void DrawStat(Texture2D icon, const char *value, int x, int y) {
@@ -448,7 +474,7 @@ void DrawGame() {
             DrawText("ENTER to buy", baseX + padding+4, baseY - 18, 24, YELLOW);
             const char* line1 = "";
             const char* line2 = "Costs";
-            const char* line3 = TextFormat("%d", i+1);
+            const char* line3 = TextFormat("%d", (i+1)/2);
             int centerX = baseX + PREVIEW_SIZE/2;
             int textY   = baseY + PREVIEW_SIZE/2;
             int w1 = MeasureText(line1, 22);
@@ -466,20 +492,26 @@ void DrawGame() {
         Enemy def = enemyTemplates[hand[i]];
         int portraitSize = PREVIEW_SIZE - padding*2;
         DrawScaled(GetEnemyTexture(hand[i]), baseX + padding, baseY + padding, portraitSize);
-        DrawText(TextFormat("%d to spawn", i+1), baseX + padding+4, baseY - 18, 24, YELLOW);
+        DrawText(TextFormat("%d to spawn", i+1), baseX + padding-1, baseY - 18, 24, YELLOW);
         int statY = baseY + padding + portraitSize;
         baseX += 8;
         int iconSize = 24;
         statY += 6;
         if(def.atk > 0) {
-            DrawScaled(texATT, baseX + PREVIEW_SIZE - padding - iconSize - 24, statY, iconSize);
-            DrawText(TextFormat("%d", def.atk), baseX + PREVIEW_SIZE - padding - 24, statY, 24, WHITE);
+            DrawScaled(texATT, baseX + PREVIEW_SIZE - padding - iconSize - 32-6, statY, iconSize);
+            DrawText(TextFormat("%d", def.atk), baseX + PREVIEW_SIZE - padding - 32, statY, 24, WHITE);
         }
-        if(def.hp > 0) {
+        else if(def.atk<0) {
+            DrawScaled(texHP, baseX + PREVIEW_SIZE - padding - iconSize - 32-6, statY, iconSize);
+            DrawText(TextFormat("%d", def.atk), baseX + PREVIEW_SIZE - padding - 32, statY, 24, WHITE);
+        }
+        if(def.hp==1) DrawText("Buff", baseX + padding, statY, 24, WHITE);
+        else if(def.hp > 0) {
             DrawScaled(texHP, baseX + padding, statY, iconSize);
             DrawText(TextFormat("%d", def.hp), baseX + padding + iconSize + 4, statY, 24, WHITE);
-            statY += 32;
         }
+            statY += 32;
+            
         if(def.treasure > 0) {
             DrawText("Win ", baseX + padding, statY, 24, GOLD);
             baseX += 50;
@@ -556,7 +588,7 @@ void ResetGame() {
     for (int i = 0; i < HAND_SIZE; i++)
         hand[i] = ENEMY_NONE;
     if(luckcontrols)
-        for (int i = 0; i < HAND_SIZE/2; i++)
+        for (int i = 0; i < HAND_SIZE; i++)
             hand[i] = RandomEnemyType();
 }
 
@@ -571,6 +603,7 @@ int main() {
     texVampire = LoadTexture("images/vampire.png");
     texSkeleton = LoadTexture("images/skeleton.png");
     texTroll = LoadTexture("images/troll.png");
+    texPotion = LoadTexture("images/potion.png");
     texCrate = LoadTexture("images/crate.png");
     texVines = LoadTexture("images/vines.png");
     texChest = LoadTexture("images/chest.png");
@@ -654,7 +687,7 @@ int main() {
             else if (luckcontrols && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
                 for (int i = 0; i < HAND_SIZE; i++) {
                     if (hand[i] == ENEMY_NONE) {
-                        int cost = i+1;
+                        int cost = (i+1)/1;
                         if (player.treasure >= cost) {
                             player.treasure -= cost;
                             hand[i] = RandomEnemyType();
