@@ -12,6 +12,7 @@
 #define MAX_DAMAGE_EVENTS 32
 #define DAMAGE_LINGER_DURATION 1.2f
 #define MAX_PASS_COUNTER 5
+#define MOVEMENT_SPEED 10
 
 int spaceCounter = 0;
 int sirkcontrols = 0;
@@ -67,13 +68,17 @@ typedef struct {
     bool alive;
     bool canMove;
     EnemyType type;
+    // visual stuff
     float hitTimer;  
+    float viewx, viewy;
+    float growing;
 } Enemy;
 
 typedef struct {
     int x, y;
     int hp, atk, stamina, mana, treasure, fun;
     float hitTimer;  
+    float viewx, viewy;
 } Player;
 
 TileType grid[GRID][GRID];
@@ -122,14 +127,17 @@ Enemy enemyTemplates[] = {
     {0,0,12,2,0, 0, true,  true,  ENEMY_TROLL},
     {0,0, 5,2,0, 5, true,  false, ENEMY_VINES},
     {0,0,20,0,6, 0, true,  false, ENEMY_CHEST},
-    {0,0, 1,0,0, 5, true,  false, ENEMY_FOOD},
-    {0,0, 1,-3,0,0, true,  false, ENEMY_POTION},
+    {0,0, 3,0,0, 5, true,  false, ENEMY_FOOD},
+    {0,0, 1,-8,0,0, true,  false, ENEMY_POTION},
 };
 
 Enemy MakeEnemy(EnemyType t, int x, int y) {
     Enemy e = enemyTemplates[t];
     e.x = x;
     e.y = y;
+    e.viewx = x;
+    e.viewy = y;
+    e.growing = 0;
     e.alive = true;
     e.hitTimer = 0.0f;
     return e;
@@ -185,6 +193,10 @@ void TryPlayerMove(int dx, int dy) {
         e->hitTimer = 0.4f;
         SpawnDamage(e->x, e->y, dmg, false);
         if(e->hp <= 0) {
+            if(e->atk<0) {
+                player.hp -= e->atk;
+                SpawnDamage(player.x, player.y, -e->atk, true);
+            }
             if(e->atk>0) player.fun += 1;
             player.treasure += e->treasure;
             if(e->food < 0) player.atk += -e->food;
@@ -246,8 +258,11 @@ void PlayerAutoTurn() {
         target->hp -= dmg;
         target->hitTimer = 0.4f;
         SpawnDamage(target->x, target->y, dmg, false);
-        if(target->hp <= 0)
-        {
+        if(target->hp <= 0) {
+            if(target->atk<0) {
+                player.hp -= target->atk;
+                SpawnDamage(player.x, player.y, -target->atk, true);
+            }
             if(target->atk>0) player.fun += 1;
             player.treasure += target->treasure;
             if(target->food<0) player.atk += -target->food;
@@ -300,7 +315,7 @@ void EnemyTurn() {
             enemies[i].hp = 0;
             enemies[i].alive = 0;
         }
-        if(abs(enemies[i].x - player.x) + abs(enemies[i].y - player.y) == 1 && enemies[i].atk) {
+        if(abs(enemies[i].x - player.x) + abs(enemies[i].y - player.y) == 1 && enemies[i].atk>0 && enemies[i].alive) {
             int dmg = (enemies[i].atk > 0) ? GetRandomValue(1, enemies[i].atk) : 0;
             player.hp -= dmg;
             has_been_damaged += dmg;
@@ -319,9 +334,9 @@ void EnemyTurn() {
         }
     }
     if(!has_been_damaged && player.hp<20 && player.stamina) {
-        player.hp += 1;
+        player.hp += 2;
         player.stamina -= 1;
-        SpawnDamage(player.x, player.y, -1, true);
+        SpawnDamage(player.x, player.y, -2, true);
     }
 }
 
@@ -385,13 +400,13 @@ void DrawGame() {
     DrawStat(texATT, TextFormat("DMG %d", player.atk), 16+140, 16);
     DrawStat(texST, player.stamina ? TextFormat("Food %d", player.stamina) : "HUNGRY", 16+140*2, 16);
     if(luckcontrols) DrawStat(texTR, TextFormat("Gold %d", player.treasure), 16+140*3, 16);
-    DrawStat(texMP, TextFormat("Sir K'S fun %d", player.fun), 16+140*4, 16);
+    DrawStat(texMP, TextFormat("Sir K's fun %d", player.fun), 16+140*4, 16);
     // terrain
     for (int y = 0; y < GRID; y++)
         for (int x = 0; x < GRID; x++)
             DrawTileBack(x, y);
     for (int i = 0; i < enemyCount; i++) {
-        if (!enemies[i].alive) continue;
+        if (!enemies[i].growing) continue;
         Color tint = WHITE;
         if(enemies[i].hitTimer > 0.0f) {
             float duration = 0.4f;
@@ -404,11 +419,14 @@ void DrawGame() {
             unsigned char b = (unsigned char)(255 * (1.0f - pulse));
             tint = (Color){ r, g, b, 255 };
         }
+        float t = enemies[i].growing;
+        float s = 1.7f;
+        float zoom = 1 + (t - 1) * (t - 1) * ((s + 1) * (t - 1) + s);
         Texture2D tex = GetEnemyTexture(enemies[i].type);
         DrawTexturePro(
             tex,
             (Rectangle){0,0,(float)tex.width,(float)tex.height},
-            (Rectangle){(float)(enemies[i].x * TILE), (float)(enemies[i].y * TILE + STATUS_BAR_SIZE), (float)TILE, (float)TILE},
+            (Rectangle){(float)((enemies[i].viewx+(1-zoom)/2) * TILE), (float)((enemies[i].viewy+(1-zoom)) * TILE + STATUS_BAR_SIZE), (float)TILE*zoom, (float)TILE*zoom},
             (Vector2){0,0}, 0, tint
         );
         int hp = enemies[i].hp;
@@ -435,11 +453,10 @@ void DrawGame() {
         unsigned char b = (unsigned char)(255 * (1.0f - pulse));
         playerTint = (Color){ r, g, b, 255 };
     }
-
     DrawTexturePro(
         texPlayer,
         (Rectangle){0,0,(float)texPlayer.width,(float)texPlayer.height},
-        (Rectangle){(float)(player.x * TILE), (float)(player.y * TILE + STATUS_BAR_SIZE), (float)TILE, (float)TILE},
+        (Rectangle){(float)(player.viewx * TILE), (float)(player.viewy * TILE + STATUS_BAR_SIZE), (float)TILE, (float)TILE},
         (Vector2){0,0}, 0, playerTint
     );
     // damage
@@ -462,7 +479,7 @@ void DrawGame() {
     // luck controls
     DrawRectangle(0, STATUS_BAR_SIZE + GRID * TILE, GRID * TILE, 2 * PREVIEW_SIZE + 80, DARKGRAY);
     if(!luckcontrols) {
-        DrawText("WASD to move", 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
+        DrawText("WASD to move.", 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
         return;
     }
     for (int i = 0; i < HAND_SIZE; i++) {
@@ -535,15 +552,15 @@ void DrawGame() {
         }
     }
     if(sirkcontrols)
-        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"WASD or SPACE to automove":TextFormat("WASD or SPACE to automove: random spawn in %d turns", MAX_PASS_COUNTER-spaceCounter),
+        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"WASD to move. SPACE to automove.":TextFormat("WASD to move. SPACE to automove.", MAX_PASS_COUNTER-spaceCounter),
                 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
     else
-        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"SPACE to automove":TextFormat("SPACE to automove: random spawn in %d turns", MAX_PASS_COUNTER-spaceCounter),
+        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"SPACE to automove. Sir K likes buffs more.":TextFormat("SPACE to automove. Sir K likes buffs more.", MAX_PASS_COUNTER-spaceCounter),
                 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
 }
 
 void HandlePressureSpawn() {
-    if(spaceCounter==MAX_PASS_COUNTER-1 && luckcontrols) interruptMessage = "Random spawn next";
+    if(spaceCounter==MAX_PASS_COUNTER-1 && luckcontrols)  interruptMessage = "Random spawn next.";
     if(spaceCounter < MAX_PASS_COUNTER) return;
     int x, y;
     int attempts = 0;
@@ -558,11 +575,12 @@ void HandlePressureSpawn() {
         for(int tries = 0; tries < 1000; tries++) {
             EnemyType roll = static_cast<EnemyType>(GetRandomValue(0, ENEMY_NONE - 1));
             bool inHand = false;
-            for(int h = 0; h < HAND_SIZE; h++)
-                if(hand[h] == roll) {
-                    inHand = true;
-                    break;
-                }
+            if(luckcontrols)
+                for(int h = 0; h < HAND_SIZE; h++)
+                    if(hand[h] == roll) {
+                        inHand = true;
+                        break;
+                    }
             if(!inHand) {
                 enemies[enemyCount] = MakeEnemy(roll, x, y);
                 if(!luckcontrols) break; // if we don't control luck, pretend that it's uniformly random
@@ -583,6 +601,8 @@ void ResetGame() {
     player = (Player){GRID / 2, GRID / 2, 20, 4, 10, 5, 0};
     player.hitTimer = 0.0f;
     player.fun = 0;
+    player.viewx = player.x;
+    player.viewy = player.y;
     for(int i = 0; i < MAX_DAMAGE_EVENTS; i++)
         damageEvents[i].active = false;
     for (int i = 0; i < HAND_SIZE; i++)
@@ -705,11 +725,30 @@ int main() {
         float dt = GetFrameTime();
         player.hitTimer -= dt;
         if(player.hitTimer < 0) player.hitTimer = 0;
-
         for(int i = 0; i < enemyCount; i++) {
             enemies[i].hitTimer -= dt;
             if(enemies[i].hitTimer < 0) enemies[i].hitTimer = 0;
+            if(enemies[i].viewx<enemies[i].x-0.1) enemies[i].viewx += dt*MOVEMENT_SPEED;
+            else if(enemies[i].viewx>enemies[i].x+0.1) enemies[i].viewx -= dt*MOVEMENT_SPEED;
+            else enemies[i].viewx = enemies[i].x;
+            if(enemies[i].viewy<enemies[i].y-0.1) enemies[i].viewy += dt*MOVEMENT_SPEED;
+            else if(enemies[i].viewy>enemies[i].y+0.1) enemies[i].viewy -= dt*MOVEMENT_SPEED;
+            else enemies[i].viewy = enemies[i].y;
+            if(!enemies[i].alive) {
+                enemies[i].growing -= dt*MOVEMENT_SPEED;
+                if(enemies[i].growing<0.f) enemies[i].growing = 0.f;
+            }
+            else {
+                enemies[i].growing += dt*MOVEMENT_SPEED;
+                if(enemies[i].growing>1.f) enemies[i].growing = 1.f;
+            }
         }
+        if(player.viewx<player.x-0.1) player.viewx += dt*MOVEMENT_SPEED;
+        else if(player.viewx>player.x+0.1) player.viewx -= dt*MOVEMENT_SPEED;
+        else player.viewx = player.x;
+        if(player.viewy<player.y-0.1) player.viewy += dt*MOVEMENT_SPEED;
+        else if(player.viewy>player.y+0.1) player.viewy -= dt*MOVEMENT_SPEED;
+        else player.viewy = player.y;
 
         for(int i = 0; i < MAX_DAMAGE_EVENTS; i++) {
             if(!damageEvents[i].active) continue;
