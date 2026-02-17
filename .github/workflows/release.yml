@@ -1,0 +1,118 @@
+name: Build Artifacts
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # =========================================================
+    # LINUX
+    # =========================================================
+    - name: Install deps (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          g++ make git zip \
+          libx11-dev libxrandr-dev libxinerama-dev \
+          libxcursor-dev libxi-dev libgl1-mesa-dev
+
+    - name: Build raylib (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        git clone --depth 1 https://github.com/raysan5/raylib.git
+        cd raylib/src
+        make PLATFORM=PLATFORM_DESKTOP
+        sudo make install
+        sudo ldconfig
+
+    - name: Build game (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: make
+
+    - name: Package (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mkdir sirkfuntime
+        cp game sirkfuntime/
+        cp -r images sirkfuntime/
+        cp -r fonts sirkfuntime/
+        ldd game | grep "=> /" | awk '{print $3}' | xargs -I{} cp {} sirkfuntime/
+        zip -r "sirkfuntime-linux.zip" sirkfuntime
+
+    - uses: actions/upload-artifact@v4
+      if: matrix.os == 'ubuntu-latest'
+      with:
+        name: game-linux
+        path: "sirkfuntime-linux.zip"
+
+    # =========================================================
+    # WINDOWS
+    # =========================================================
+    - name: Install deps (Windows)
+      if: matrix.os == 'windows-latest'
+      run: vcpkg install raylib:x64-mingw-static
+      shell: pwsh
+
+    - name: Build game (Windows)
+      if: matrix.os == 'windows-latest'
+      run: g++ -std=gnu++17 -O2 -static -static-libgcc -static-libstdc++ -Wall ^
+        main.cpp -o game.exe ^
+        -IC:/vcpkg/installed/x64-mingw-static/include ^
+        -LC:/vcpkg/installed/x64-mingw-static/lib ^
+        -lraylib -lglfw3 ^
+        -lopengl32 -lgdi32 -lwinmm -luser32 -lshell32 -lole32 -luuid
+      shell: cmd
+
+
+    - name: Package (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        mkdir sirkfuntime
+        copy game.exe sirkfuntime\
+        xcopy /E /I images sirkfuntime\images
+        xcopy /E /I fonts sirkfuntime\fonts
+        tar -a -c -f "sirkfuntime-windows.zip" sirkfuntime
+      shell: cmd
+
+    - uses: actions/upload-artifact@v4
+      if: matrix.os == 'windows-latest'
+      with:
+        name: game-windows
+        path: "sirkfuntime-windows.zip"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Delete snapshot release (if exists)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release delete snapshot -y || true
+
+    - uses: softprops/action-gh-release@v2
+      with:
+        tag_name: snapshot
+        name: Snapshot Build
+        prerelease: true
+        files: |
+          artifacts/game-linux/sirkfuntime-linux.zip
+          artifacts/game-windows/sirkfuntime-windows.zip
