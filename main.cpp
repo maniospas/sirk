@@ -201,6 +201,10 @@ void TryPlayerMove(int dx, int dy) {
     if(!Inside(nx, ny)) return;
     Enemy* e = EnemyAt(nx, ny);
     if(e) {
+        if(player.atk>1 && GetRandomValue(0,99)<3*player.atk && !interruptMessage) {
+            player.atk--;
+            interruptMessage = "Reduced combat.";
+        }
         int dmg = (player.atk > 0) ? GetRandomValue(1, player.atk) : 0;
         e->hp -= dmg;
         e->hitTimer = 0.4f;
@@ -264,9 +268,9 @@ void PlayerAutoTurn() {
     int dy = target->y - player.y;
     if(abs(dx) + abs(dy) == 1) {
         int dmg = (player.atk > 0) ? GetRandomValue(1, player.atk) : 0;
-        if(player.atk>1 && GetRandomValue(0,99)<10 && !interruptMessage) {
+        if(player.atk>1 && GetRandomValue(0,99)<3*player.atk && !interruptMessage) {
             player.atk--;
-            interruptMessage = "LESS DMG";
+            interruptMessage = "Reduced combat.";
         }
         target->hp -= dmg;
         target->hitTimer = 0.4f;
@@ -414,7 +418,7 @@ void DrawGame() {
     int topspacing = 100;
     DrawStat(texHP, "Health", TextFormat("%d", player.hp), 16, 12);
     DrawStat(texATT, "Combat", TextFormat("%d", player.atk), 16+topspacing*2, 12);
-    DrawStat(texST, "Regen", player.stamina ? TextFormat("%d", player.stamina) : "HUNGRY", 16+topspacing, 12);
+    DrawStat(texST, "Food", player.stamina ? TextFormat("%d", player.stamina) : "0", 16+topspacing, 12);
     if(luckcontrols) DrawStat(texTR, "Gold", TextFormat("%d", player.treasure), GetScreenWidth()-240, 12);
     DrawStat(texMP, "Sir K's fun", TextFormat("%d", player.fun), GetScreenWidth()-140, 12);
     // terrain
@@ -439,6 +443,17 @@ void DrawGame() {
         float s = 1.7f;
         float zoom = 1 + (t - 1) * (t - 1) * ((s + 1) * (t - 1) + s);
         Texture2D tex = GetEnemyTexture(enemies[i].type);
+        DrawTexturePro(
+            tex,
+            (Rectangle){0,0,(float)tex.width,(float)-tex.height}, // flip source vertically
+            (Rectangle){
+                (float)((enemies[i].viewx+(1-zoom)/2) * TILE),
+            (float)((enemies[i].viewy+(1-zoom)) * TILE + STATUS_BAR_SIZE + TILE*zoom),
+            (float)TILE*zoom,
+            (float)TILE*zoom*0.35f   // positive height now (already flipped via src)
+            },
+            (Vector2){0,0}, 0, (Color){0,0,0,110}
+        );
         DrawTexturePro(
             tex,
             (Rectangle){0,0,(float)tex.width,(float)tex.height},
@@ -469,6 +484,18 @@ void DrawGame() {
         unsigned char b = (unsigned char)(255 * (1.0f - pulse));
         playerTint = (Color){ r, g, b, 255 };
     }
+    float zoom = 1.f;
+    DrawTexturePro(
+        texPlayer,
+        (Rectangle){0,0,(float)texPlayer.width,(float)-texPlayer.height}, // flip source vertically
+        (Rectangle){
+            (float)((player.viewx+(1-zoom)/2) * TILE),
+        (float)((player.viewy+(1-zoom)) * TILE + STATUS_BAR_SIZE + TILE*zoom),
+        (float)TILE*zoom,
+        (float)TILE*zoom*0.35f   // positive height now (already flipped via src)
+        },
+        (Vector2){0,0}, 0, (Color){0,0,0,110}
+    );
     DrawTexturePro(
         texPlayer,
         (Rectangle){0,0,(float)texPlayer.width,(float)texPlayer.height},
