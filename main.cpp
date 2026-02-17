@@ -116,12 +116,12 @@ bool EmptyTile(int x, int y) {
 
 Enemy enemyTemplates[] = {
     {0,0, 8,3,2, 0, true,  true,  ENEMY_VAMPIRE},
-    {0,0, 5,5,2, 0, true,  true,  ENEMY_SKELETON},
+    {0,0, 5,4,4, 0, true,  true,  ENEMY_SKELETON},
     {0,0, 1,0,0,-1, true,  false, ENEMY_WEAPON},
     {0,0, 5,0,0, 0, true,  false, ENEMY_CRATE},
     {0,0,12,2,0, 0, true,  true,  ENEMY_TROLL},
     {0,0, 5,2,0, 5, true,  false, ENEMY_VINES},
-    {0,0,20,0,5, 0, true,  false, ENEMY_CHEST},
+    {0,0,20,0,6, 0, true,  false, ENEMY_CHEST},
     {0,0, 1,0,0, 5, true,  false, ENEMY_FOOD},
     {0,0, 1,-3,0,0, true,  false, ENEMY_POTION},
 };
@@ -369,7 +369,7 @@ void PlaceEnemyFromHand(int slot) {
     for(int i = slot; i < HAND_SIZE - 1; i++)
         hand[i] = hand[i + 1];
     hand[HAND_SIZE - 1] = ENEMY_NONE;
-    if(slot == 0) hand[0] = RandomEnemyType();
+    if(hand[0] == ENEMY_NONE) hand[0] = RandomEnemyType();
 }
 
 void DrawStat(Texture2D icon, const char *value, int x, int y) {
@@ -471,7 +471,7 @@ void DrawGame() {
         int padding = 5;
         DrawScaledDistorted(texCard, baseX, baseY+10, PREVIEW_SIZE, PREVIEW_SIZE*3/2);
         if(hand[i] == ENEMY_NONE) {
-            DrawText("ENTER to buy", baseX + padding+4, baseY - 18, 24, YELLOW);
+            DrawText("ENTER to buy", baseX + padding-18, baseY - 18, 24, YELLOW);
             const char* line1 = "";
             const char* line2 = "Costs";
             const char* line3 = TextFormat("%d", (i+1)/2);
