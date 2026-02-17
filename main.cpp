@@ -21,7 +21,7 @@
 #define PREVIEW_SIZE 128
 #define MAX_ENEMIES 1024
 #define HAND_SIZE 4
-#define STATUS_BAR_SIZE 112
+#define STATUS_BAR_SIZE 130
 #define MAX_DAMAGE_EVENTS 32
 #define DAMAGE_LINGER_DURATION 1.2f
 #define MAX_PASS_COUNTER 5
@@ -397,23 +397,26 @@ void PlaceEnemyFromHand(int slot) {
     for(int i = slot; i < HAND_SIZE - 1; i++)
         hand[i] = hand[i + 1];
     hand[HAND_SIZE - 1] = ENEMY_NONE;
-    if(hand[0] == ENEMY_NONE) hand[0] = RandomEnemyType();
+    //if(hand[0] == ENEMY_NONE) hand[0] = RandomEnemyType();
 }
 
-void DrawStat(Texture2D icon, const char *value, int x, int y) {
+void DrawStat(Texture2D icon, const char *title, const char *value, int x, int y) {
     int iconSize = 32;
+    DrawText(title, x, y+4, 24, WHITE);
+    y += 24;
     DrawScaled(icon, x, y, iconSize);
-    DrawText(value, x + iconSize + 10, y + iconSize / 4, 24, WHITE);
+    DrawText(value, x + iconSize + 10, y + iconSize / 8, 32, WHITE);
 }
 
 void DrawGame() {
     // top bar
     DrawRectangle(0, 0, GRID * TILE, STATUS_BAR_SIZE, DARKGRAY);
-    DrawStat(texHP, TextFormat("HP %d", player.hp), 16, 16);
-    DrawStat(texATT, TextFormat("DMG %d", player.atk), 16+140, 16);
-    DrawStat(texST, player.stamina ? TextFormat("Food %d", player.stamina) : "HUNGRY", 16+140*2, 16);
-    if(luckcontrols) DrawStat(texTR, TextFormat("Gold %d", player.treasure), 16+140*3, 16);
-    DrawStat(texMP, TextFormat("Sir K's fun %d", player.fun), 16+140*4, 16);
+    int topspacing = 100;
+    DrawStat(texHP, "Health", TextFormat("%d", player.hp), 16, 12);
+    DrawStat(texATT, "Combat", TextFormat("%d", player.atk), 16+topspacing*2, 12);
+    DrawStat(texST, "Regen", player.stamina ? TextFormat("%d", player.stamina) : "HUNGRY", 16+topspacing, 12);
+    if(luckcontrols) DrawStat(texTR, "Gold", TextFormat("%d", player.treasure), GetScreenWidth()-240, 12);
+    DrawStat(texMP, "Sir K's fun", TextFormat("%d", player.fun), GetScreenWidth()-140, 12);
     // terrain
     for (int y = 0; y < GRID; y++)
         for (int x = 0; x < GRID; x++)
@@ -504,7 +507,7 @@ void DrawGame() {
             DrawText("ENTER to buy", baseX + padding-18, baseY - 18, 24, YELLOW);
             const char* line1 = "";
             const char* line2 = "Costs";
-            const char* line3 = TextFormat("%d", (i+1)/2);
+            const char* line3 = TextFormat("%d", (i+1));
             int centerX = baseX + PREVIEW_SIZE/2;
             int textY   = baseY + PREVIEW_SIZE/2;
             int w1 = MeasureText(line1, 22);
@@ -568,7 +571,7 @@ void DrawGame() {
         DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"WASD to move. SPACE to automove.":TextFormat("WASD to move. SPACE to automove.", MAX_PASS_COUNTER-spaceCounter),
                 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
     else
-        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"SPACE to automove. Sir K likes buffs more.":TextFormat("SPACE to automove. Sir K likes buffs more.", MAX_PASS_COUNTER-spaceCounter),
+        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"SPACE to automove. Sir K prioritizes buffs.":TextFormat("SPACE to automove. Sir K prioritizes buffs.", MAX_PASS_COUNTER-spaceCounter),
                 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
 }
 
@@ -720,7 +723,7 @@ int main() {
             else if (luckcontrols && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
                 for (int i = 0; i < HAND_SIZE; i++) {
                     if (hand[i] == ENEMY_NONE) {
-                        int cost = (i+1)/1;
+                        int cost = (i+1);
                         if (player.treasure >= cost) {
                             player.treasure -= cost;
                             hand[i] = RandomEnemyType();
