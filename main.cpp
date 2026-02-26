@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
+#include <fstream>
 
 #define GRID 8
 #define TILE 96
@@ -40,12 +41,15 @@ typedef enum {
     ENEMY_VAMPIRE,
     ENEMY_SKELETON,
     ENEMY_WEAPON,
+    ENEMY_FIREBALL,
     ENEMY_CRATE,
     ENEMY_TROLL,
     ENEMY_VINES,
     ENEMY_CHEST,
     ENEMY_FOOD,
     ENEMY_POTION,
+    ENEMY_WIZARDLING,
+    ENEMY_RAT,
     ENEMY_NONE
 } EnemyType;
 typedef struct {
@@ -99,7 +103,7 @@ Enemy enemies[MAX_ENEMIES];
 int enemyCount = 0;
 EnemyType hand[HAND_SIZE];
 Player player;
-Texture2D texPlayer, texVampire, texSkeleton, texPotion, texTroll, texCrate, texVines, texChest, texWall, texFloor, texPillar, texHP, texST, texMP, texTR, texATT, texCard;
+Texture2D texPlayer, texVampire, texSkeleton, texPotion, texTroll, texRat, texWizardling, texCrate, texFireball, texVines, texChest, texWall, texFloor, texPillar, texHP, texST, texMP, texTR, texATT, texCard;
 Font gameFont;
 
 void SpawnDamage(int x, int y, int amount, bool isPlayer) {
@@ -134,14 +138,17 @@ bool EmptyTile(int x, int y) {
 
 Enemy enemyTemplates[] = {
     {0,0, 8,3,2, 0, true,  true,  ENEMY_VAMPIRE},
-    {0,0, 5,4,4, 0, true,  true,  ENEMY_SKELETON},
+    {0,0, 5,4,3, 0, true,  true,  ENEMY_SKELETON},
     {0,0, 1,0,0,-1, true,  false, ENEMY_WEAPON},
+    {0,0, 9,0,0,-3, true,  false, ENEMY_FIREBALL},
     {0,0, 5,0,0, 0, true,  false, ENEMY_CRATE},
     {0,0,12,2,0, 0, true,  true,  ENEMY_TROLL},
     {0,0, 5,2,0, 5, true,  false, ENEMY_VINES},
-    {0,0,20,0,6, 0, true,  false, ENEMY_CHEST},
+    {0,0,20,0,4, 0, true,  false, ENEMY_CHEST},
     {0,0, 3,0,0, 5, true,  false, ENEMY_FOOD},
-    {0,0, 1,-8,0,0, true,  false, ENEMY_POTION},
+    {0,0,1,-8,0, 0, true,  false, ENEMY_POTION},
+    {0,0,3, 6,1, 0, true,  true,  ENEMY_WIZARDLING},
+    {0,0,2, 1,0, 1, true,  true,  ENEMY_RAT},
 };
 
 Enemy MakeEnemy(EnemyType t, int x, int y) {
@@ -188,10 +195,13 @@ Texture2D GetEnemyTexture(EnemyType t) {
     if(t == ENEMY_TROLL) return texTroll;
     if(t == ENEMY_CRATE) return texCrate;
     if(t == ENEMY_WEAPON) return texATT;
+    if(t == ENEMY_FIREBALL) return texFireball;
     if(t == ENEMY_VINES) return texVines;
     if(t == ENEMY_CHEST) return texChest;
     if(t == ENEMY_FOOD) return texST;
     if(t == ENEMY_POTION) return texPotion;
+    if(t == ENEMY_WIZARDLING) return texWizardling;
+    if(t == ENEMY_RAT) return texRat;
     return texChest;
 }
 
@@ -320,6 +330,20 @@ void PlayerAutoTurn() {
     }
 }
 
+int loadHighScore() {
+    std::ifstream file("sirk.dat");
+    int score = 0;
+    if (file.is_open())
+        file >> score;
+    return score;
+}
+
+void saveHighScore(int score) {
+    std::ofstream file("sirk.dat", std::ios::trunc);
+    if (file.is_open())
+        file << score;
+}
+
 
 void EnemyTurn() {
     int has_been_damaged = 0;
@@ -361,7 +385,7 @@ void PlaceEnemyFromHand(int slot) {
     if(enemyCount >= MAX_ENEMIES) return;
     if(hand[slot] == ENEMY_NONE) return;
     interruptMessage = nullptr;
-    spaceCounter = 0;
+    spaceCounter -= 5;
     Enemy def = enemyTemplates[hand[slot]];
     int x = -1;
     int y = -1;
@@ -415,10 +439,10 @@ void DrawStat(Texture2D icon, const char *title, const char *value, int x, int y
 void DrawGame() {
     // top bar
     DrawRectangle(0, 0, GRID * TILE, STATUS_BAR_SIZE, DARKGRAY);
-    int topspacing = 100;
-    DrawStat(texHP, "Health", TextFormat("%d", player.hp), 16, 12);
-    DrawStat(texATT, "Combat", TextFormat("%d", player.atk), 16+topspacing*2, 12);
-    DrawStat(texST, "Food", player.stamina ? TextFormat("%d", player.stamina) : "0", 16+topspacing, 12);
+    int topspacing = 150;
+    DrawStat(texHP, "Health", TextFormat("%d/20", player.hp), 16, 12);
+    DrawStat(texATT, "Combat", TextFormat("%d/4", player.atk), 16+topspacing*2-15, 12);
+    DrawStat(texST, "Food", player.stamina ? TextFormat("%d/10", player.stamina) : "0", 16+topspacing, 12);
     if(luckcontrols) DrawStat(texTR, "Gold", TextFormat("%d", player.treasure), GetScreenWidth()-240, 12);
     DrawStat(texMP, "Sir K's fun", TextFormat("%d", player.fun), GetScreenWidth()-140, 12);
     // terrain
@@ -597,14 +621,15 @@ void DrawGame() {
     if(sirkcontrols)
         DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"WASD to move. SPACE to automove.":TextFormat("WASD to move. SPACE to automove.", MAX_PASS_COUNTER-spaceCounter),
                 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
-    else
-        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"SPACE to automove. Sir K prioritizes buffs.":TextFormat("SPACE to automove. Sir K prioritizes buffs.", MAX_PASS_COUNTER-spaceCounter),
-                24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
+    // else
+    //     DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"Sir K prioritizes buffs.":TextFormat("Sir K prioritizes buffs.", MAX_PASS_COUNTER-spaceCounter),
+    //             24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
 }
 
 void HandlePressureSpawn() {
-    if(spaceCounter==MAX_PASS_COUNTER-1 && luckcontrols)  interruptMessage = "Random spawn next.";
+    if(spaceCounter==MAX_PASS_COUNTER-1 && luckcontrols) interruptMessage = "Spawn...";
     if(spaceCounter < MAX_PASS_COUNTER) return;
+    interruptMessage = nullptr;
     int x, y;
     int attempts = 0;
     do {
@@ -656,18 +681,22 @@ void ResetGame() {
 }
 
 int main() {
+    int highScore = loadHighScore();
     InitWindow(GRID * TILE, GRID * TILE + 2 * PREVIEW_SIZE + STATUS_BAR_SIZE + 80, "Sir K's Funtime");
     SetTargetFPS(60);
     srand(time(NULL));
-    gameFont = LoadFontEx("fonts/Beholden-Regular.ttf", 24, 0, 0);
+    gameFont = LoadFontEx("fonts/Beholden-Regular.ttf", 48, 0, 0);
     SetTextureFilter(gameFont.texture, TEXTURE_FILTER_BILINEAR);
     texCard = LoadTexture("images/card.png");
     texPlayer = LoadTexture("images/player.png");
     texVampire = LoadTexture("images/vampire.png");
     texSkeleton = LoadTexture("images/skeleton.png");
     texTroll = LoadTexture("images/troll.png");
+    texWizardling = LoadTexture("images/wizardling.png");
+    texRat = LoadTexture("images/rat.png");
     texPotion = LoadTexture("images/potion.png");
     texCrate = LoadTexture("images/crate.png");
+    texFireball = LoadTexture("images/fireball.png");
     texVines = LoadTexture("images/vines.png");
     texChest = LoadTexture("images/chest.png");
     texWall = LoadTexture("images/wall.png");
@@ -686,8 +715,9 @@ int main() {
         hand[i] = ENEMY_NONE;
     for (int i = 0; i < HAND_SIZE/2; i++)
         hand[i] = RandomEnemyType();
-    while (!WindowShouldClose())
-    {
+    float autoturn = 0;
+    while (!WindowShouldClose()) {
+        float dt = GetFrameTime();
         if(gameState == GAME_SPLASH) {
             if(IsKeyPressed(KEY_SPACE))
             {
@@ -712,12 +742,14 @@ int main() {
         }
         else 
         {   
+            autoturn += dt*(2+player.fun*0.1);
             if (sirkcontrols && IsKeyPressed(KEY_W)) {
                 interruptMessage = nullptr;
                 TryPlayerMove(0, -1);
                 EnemyTurn();
                 spaceCounter++;
                 HandlePressureSpawn();
+                autoturn = 0;
             }
             else if (sirkcontrols && IsKeyPressed(KEY_S)) {
                 interruptMessage = nullptr;
@@ -725,6 +757,7 @@ int main() {
                 EnemyTurn();
                 spaceCounter++;
                 HandlePressureSpawn();
+                autoturn = 0;
             }
             else if (sirkcontrols && IsKeyPressed(KEY_A)) {
                 interruptMessage = nullptr;
@@ -732,6 +765,7 @@ int main() {
                 EnemyTurn();
                 spaceCounter++;
                 HandlePressureSpawn();
+                autoturn = 0;
             }
             else if (sirkcontrols && IsKeyPressed(KEY_D)) {
                 interruptMessage = nullptr;
@@ -739,14 +773,16 @@ int main() {
                 EnemyTurn();
                 spaceCounter++;
                 HandlePressureSpawn();
+                autoturn = 0;
             }
-            else if (luckcontrols && IsKeyPressed(KEY_SPACE)) {
-                interruptMessage = nullptr;
-                PlayerAutoTurn();
-                EnemyTurn();
-                spaceCounter++;
-                HandlePressureSpawn();
-            }
+            // else if (luckcontrols && IsKeyPressed(KEY_SPACE)) {
+            //     interruptMessage = nullptr;
+            //     PlayerAutoTurn();
+            //     EnemyTurn();
+            //     spaceCounter++;
+            //     HandlePressureSpawn();
+            //     autoturn = 0;
+            // }
             else if (luckcontrols && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
                 for (int i = 0; i < HAND_SIZE; i++) {
                     if (hand[i] == ENEMY_NONE) {
@@ -761,11 +797,23 @@ int main() {
             }
             else if (luckcontrols) 
                 for (int i = 0; i < HAND_SIZE; i++)
-                    if (IsKeyPressed(KEY_ONE + i) || IsKeyPressed(KEY_KP_1 + i)) 
+                    if (IsKeyPressed(KEY_ONE + i) || IsKeyPressed(KEY_KP_1 + i)) {
                         PlaceEnemyFromHand(i);
+                        autoturn = 0;
+                    }
+
+            if(autoturn>1 && luckcontrols && player.hp>0) {
+                PlayerAutoTurn();
+                EnemyTurn();
+                spaceCounter++;
+                HandlePressureSpawn();
+                autoturn = 0;
+            }
+            if(player.hp>20) player.hp = 20;
+            if(player.atk>4) player.atk = 4;
+            if(player.stamina>10) player.stamina = 10;
         }
 
-        float dt = GetFrameTime();
         player.hitTimer -= dt;
         if(player.hitTimer < 0) player.hitTimer = 0;
         for(int i = 0; i < enemyCount; i++) {
@@ -802,25 +850,27 @@ int main() {
 
         BeginDrawing();
         ClearBackground(BLACK);
-        if(gameState == GAME_SPLASH)
-        {
+        if(gameState == GAME_SPLASH) {
             int screenW = GetScreenWidth();
             int screenH = GetScreenHeight();
             DrawRectangle(0, 0, screenW, screenH, BLACK);
             int titleSize = 80;
             int promptSize = 32;
+            int smallSize = 22;
             DrawText("SIR K'S FUNTIME", screenW/2 - MeasureText("SIR K'S FUNTIME", titleSize)/2, screenH/2 - 200, titleSize, WHITE);
-            DrawText("AD to change controls / SPACE to start", screenW/2 - MeasureText("AD to change controls / SPACE to start", promptSize)/2, screenH/2 + 160, promptSize, Fade(YELLOW, 0.8));
+            DrawText("Sir K is bored. He jumps into the arena", screenW/2 - MeasureText("Sir K is bored. He jumps into the arena.", promptSize)/2, screenH/2 + 130, promptSize, Fade(WHITE, 0.8));
+            DrawText("for some fun. What do you control?", screenW/2 - MeasureText("Sir K is bored. He jumps into the arena.", promptSize)/2, screenH/2 + 170, promptSize, Fade(WHITE, 0.8));
+            DrawText("AD to change option, SPACE to start", screenW/2 - MeasureText("AD to change option, SPACE to start", smallSize)/2, screenH/2 + 300, smallSize, Fade(YELLOW, 0.8));
             const char* opt1 = "Sir K";
-            const char* opt2 = "Spawns";
+            const char* opt2 = "The arena";
             const char* opt3 = "Both";
             float pulse = 0.5f + 0.5f * sinf(GetTime() * 4.0f);
             Color c1 = (sirkcontrols && !luckcontrols) ? Fade(WHITE, 0.6f + 0.4f*pulse) : Fade(GRAY, 0.7f);
             Color c2 = (!sirkcontrols && luckcontrols) ? Fade(WHITE, 0.6f + 0.4f*pulse) : Fade(GRAY, 0.7f);
             Color c3 = (sirkcontrols && luckcontrols) ? Fade(WHITE, 0.6f + 0.4f*pulse) : Fade(GRAY, 0.7f);
-            DrawText(opt1, screenW/2 - MeasureText(opt1, promptSize)/2-100, screenH/2 + 210, promptSize, c1);
-            DrawText(opt2, screenW/2 - MeasureText(opt2, promptSize)/2, screenH/2 + 210, promptSize, c2);
-            DrawText(opt3, screenW/2 - MeasureText(opt3, promptSize)/2+100, screenH/2 + 210, promptSize, c3);
+            DrawText(opt1, screenW/2 - MeasureText(opt1, promptSize)/2-140, screenH/2 + 260, promptSize, c1);
+            DrawText(opt2, screenW/2 - MeasureText(opt2, promptSize)/2, screenH/2 + 260, promptSize, c2);
+            DrawText(opt3, screenW/2 - MeasureText(opt3, promptSize)/2+140, screenH/2 + 260, promptSize, c3);
             int iconSize = 96;
             int spacing = 0;
             Texture2D icons[4] = { texPlayer, texATT, texTroll };
@@ -840,21 +890,36 @@ int main() {
         }
         DrawGame();
         if (player.hp <= 0) {
+            if (player.fun > highScore) {
+                highScore = player.fun;
+                saveHighScore(highScore);
+            }
             int screenW = GetScreenWidth();
             int screenH = GetScreenHeight();
             DrawRectangle(0, 0, screenW, screenH, Fade(BLACK, 0.8f));
-            const char *msg = TextFormat("SIR K'S FUN %d", player.fun);
+            const char *msg = TextFormat("SIR K'S FUN: %d", player.fun);
             int fontSize = 64;
             int textW = MeasureText(msg, fontSize);
-            int textH = fontSize;
+            int textH = fontSize*2;
             int panelPadding = 40;
             int panelW = textW + panelPadding * 2;
             int panelH = textH + panelPadding * 2;
             int panelX = (screenW - panelW) / 2;
             int panelY = (screenH - panelH) / 2-150;
             DrawRectangleRounded((Rectangle){(float)panelX, (float)panelY, (float)panelW, (float)panelH}, 0.2f, 12, DARKGRAY);
-            DrawRectangleRoundedLines((Rectangle){(float)panelX, (float)panelY, (float)panelW, (float)panelH}, 0.2f, 12, RED);
-            DrawText(msg, panelX + (panelW - textW) / 2, panelY + (panelH - textH) / 2, fontSize, RED);
+            DrawRectangleRoundedLines((Rectangle){(float)panelX, (float)panelY, (float)panelW, (float)panelH}, 0.2f, 12, player.fun>=highScore ? GREEN : RED);
+            DrawText(msg, panelX + (panelW - textW) / 2, panelY + (panelH - textH) / 2, fontSize, player.fun>=highScore ? GREEN : RED);
+
+            int subFont = 64;
+            const char* hsMsg;
+            if (player.fun>=highScore) hsMsg = "HIGH SCORE!";
+            else hsMsg = TextFormat("MOST FUN: %d", highScore);
+            int hsW = MeasureText(hsMsg, subFont);
+            DrawText(hsMsg,
+                     panelX + (panelW - hsW) / 2,
+                     panelY + (panelH - textH) / 2 + textH*3/4-20,
+                     subFont,
+                     player.fun>=highScore ? GREEN : LIGHTGRAY);
         }
         else if(interruptMessage) {
             int screenW = GetScreenWidth();
