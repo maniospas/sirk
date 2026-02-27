@@ -19,7 +19,7 @@
 
 #define GRID 8
 #define TILE 96
-#define PREVIEW_SIZE 128
+#define PREVIEW_SIZE 168
 #define MAX_ENEMIES 1024
 #define HAND_SIZE 4
 #define STATUS_BAR_SIZE 130
@@ -145,9 +145,9 @@ Enemy enemyTemplates[] = {
     {0,0,12,2,0, 0, true,  true,  ENEMY_TROLL},
     {0,0, 5,2,0, 5, true,  false, ENEMY_VINES},
     {0,0,20,0,4, 0, true,  false, ENEMY_CHEST},
-    {0,0, 3,0,0, 5, true,  false, ENEMY_FOOD},
+    {0,0, 1,0,0, 5, true,  false, ENEMY_FOOD},
     {0,0,1,-8,0, 0, true,  false, ENEMY_POTION},
-    {0,0,3, 6,1, 0, true,  true,  ENEMY_WIZARDLING},
+    {0,0,3, 0,2, 0, true,  true,  ENEMY_WIZARDLING},
     {0,0,2, 1,0, 1, true,  true,  ENEMY_RAT},
 };
 
@@ -259,8 +259,18 @@ void PlayerAutoTurn() {
             target = &enemies[i];
         }
     }
+    // immediately prioritize adjacent buffs (hp==1)
+    for(int i = 0; i < enemyCount; i++) {
+        if(enemies[i].hp!=1) continue;
+        int dist = abs(enemies[i].x - player.x) + abs(enemies[i].y - player.y);
+        if(dist<=1) {
+            bestDist = dist;
+            target = &enemies[i];
+        }
+    }
 
     if(!target) {
+        spaceCounter = 5;
         // optional: random movement when no enemies
         int dx[4] = {1,-1,0,0};
         int dy[4] = {0,0,1,-1};
@@ -428,23 +438,24 @@ void PlaceEnemyFromHand(int slot) {
     //if(hand[0] == ENEMY_NONE) hand[0] = RandomEnemyType();
 }
 
-void DrawStat(Texture2D icon, const char *title, const char *value, int x, int y) {
-    int iconSize = 32;
-    DrawText(title, x, y+4, 24, WHITE);
-    y += 24;
-    DrawScaled(icon, x, y, iconSize);
+void DrawStat(Texture2D icon, const char *title, const char *value, int x, int y, int iconOffset) {
+    int iconSize = 42;
+    //DrawText(title, x, y+4, 24, WHITE);
+    //y += 24;
+    y += 12;
+    DrawScaled(icon, x, y+iconOffset, iconSize);
     DrawText(value, x + iconSize + 10, y + iconSize / 8, 32, WHITE);
 }
 
 void DrawGame() {
     // top bar
     DrawRectangle(0, 0, GRID * TILE, STATUS_BAR_SIZE, DARKGRAY);
-    int topspacing = 150;
-    DrawStat(texHP, "Health", TextFormat("%d/20", player.hp), 16, 12);
-    DrawStat(texATT, "Combat", TextFormat("%d/4", player.atk), 16+topspacing*2-15, 12);
-    DrawStat(texST, "Food", player.stamina ? TextFormat("%d/10", player.stamina) : "0", 16+topspacing, 12);
-    if(luckcontrols) DrawStat(texTR, "Gold", TextFormat("%d", player.treasure), GetScreenWidth()-240, 12);
-    DrawStat(texMP, "Sir K's fun", TextFormat("%d", player.fun), GetScreenWidth()-140, 12);
+    int topspacing = 155;
+    DrawStat(texHP, "Health", TextFormat("%d/20", player.hp), 16, 12, -5);
+    DrawStat(texATT, "Combat", TextFormat("%d/4", player.atk), 16+topspacing*2-15, 12, -10);
+    DrawStat(texST, "Food", player.stamina ? TextFormat("%d/10", player.stamina) : "0", 16+topspacing, 12, -10);
+    if(luckcontrols) DrawStat(texTR, "Gold", TextFormat("%d", player.treasure), GetScreenWidth()-100, 12, 0);
+    //DrawStat(texMP, "Sir K's fun", TextFormat("%d", player.fun), GetScreenWidth()-240, 12);
     // terrain
     for (int y = 0; y < GRID; y++)
         for (int x = 0; x < GRID; x++)
@@ -552,70 +563,77 @@ void DrawGame() {
     for (int i = 0; i < HAND_SIZE; i++) {
         int baseX = 20 + i * (PREVIEW_SIZE + 20);
         int baseY = GRID * TILE + 90 + STATUS_BAR_SIZE;
-        int padding = 5;
+        int padding = 8;
         DrawScaledDistorted(texCard, baseX, baseY+10, PREVIEW_SIZE, PREVIEW_SIZE*3/2);
         if(hand[i] == ENEMY_NONE) {
-            DrawText("ENTER to buy", baseX + padding-18, baseY - 18, 24, YELLOW);
+            DrawText("ENTER", baseX + PREVIEW_SIZE/2 - MeasureText("ENTER", 32)/2, baseY - 24, 32, YELLOW);
             const char* line1 = "";
-            const char* line2 = "Costs";
+            const char* line2 = "Buy for";
             const char* line3 = TextFormat("%d", (i+1));
             int centerX = baseX + PREVIEW_SIZE/2;
-            int textY   = baseY + PREVIEW_SIZE/2;
-            int w1 = MeasureText(line1, 22);
-            int w2 = MeasureText(line2, 22);
-            int w3 = MeasureText(line3, 18);
-            DrawText(line1, centerX - w1/2, textY, 24, YELLOW);
-            DrawText(line2, centerX - w2/2, textY + 22, 24, WHITE);
-            int iconSize = 24;
+            int textY   = baseY + PREVIEW_SIZE/2 - 70;
+            int w1 = MeasureText(line1, 32);
+            int w2 = MeasureText(line2, 32);
+            int w3 = MeasureText(line3, 32);
+            DrawText(line1, centerX - w1/2, textY, 32, YELLOW);
+            DrawText(line2, centerX - w2/2, textY + 34, 32, WHITE);
+            int iconSize = 32;
             int totalWidth = iconSize + 6 + w3;
             int startX = centerX - totalWidth/2;
-            DrawScaled(texTR, startX, textY + 46, iconSize);
-            DrawText(line3, startX + iconSize + 6, textY + 46, 24, GOLD);
+            DrawScaled(texTR, startX, textY + 64, iconSize);
+            DrawText(line3, startX + iconSize + 6, textY + 64, 32, GOLD);
             break;
         }
         Enemy def = enemyTemplates[hand[i]];
-        int portraitSize = PREVIEW_SIZE - padding*2;
-        DrawScaled(GetEnemyTexture(hand[i]), baseX + padding, baseY + padding, portraitSize);
-        DrawText(TextFormat("%d to spawn", i+1), baseX + padding-1, baseY - 18, 24, YELLOW);
-        int statY = baseY + padding + portraitSize;
+        int portraitSize = PREVIEW_SIZE - padding*8;
+        DrawScaled(GetEnemyTexture(hand[i]), baseX + padding*4, baseY + padding*4, portraitSize);
+        DrawText(TextFormat("%d: spawn", i+1), baseX + padding+5, baseY - 24, 32, YELLOW);
+        int statY = baseY + padding + portraitSize + 20;
         baseX += 8;
-        int iconSize = 24;
-        statY += 6;
+        int iconSize = 34;
+        statY += 36;
+        padding -= 5;
+        if(def.hp==1) {
+            //DrawText("Buff", baseX + padding, statY, 32, WHITE);
+        }
+        else if(def.hp > 0) {
+            DrawScaled(texHP, baseX + padding, statY-5, iconSize);
+            DrawText(TextFormat("%d", def.hp), baseX + padding + iconSize + 4, statY, 32, WHITE);
+            statY += 36;
+        }
         if(def.atk > 0) {
-            DrawScaled(texATT, baseX + PREVIEW_SIZE - padding - iconSize - 32-6, statY, iconSize);
-            DrawText(TextFormat("%d", def.atk), baseX + PREVIEW_SIZE - padding - 32, statY, 24, WHITE);
+            DrawScaled(texATT, baseX + padding, statY-5, iconSize);
+            DrawText(TextFormat("%d", def.atk), baseX + padding + iconSize + 4, statY, 32, WHITE);
+
+            statY = baseY + padding + portraitSize + 20;
+            baseX += portraitSize/2 + 20;
+            statY += 36;
         }
         else if(def.atk<0) {
-            DrawScaled(texHP, baseX + PREVIEW_SIZE - padding - iconSize - 32-6, statY, iconSize);
-            DrawText(TextFormat("%d", def.atk), baseX + PREVIEW_SIZE - padding - 32, statY, 24, WHITE);
+            statY = baseY + padding + portraitSize + 20;
+            statY += 36;
+            baseX += portraitSize/2 + 20;
+            DrawScaled(texHP, baseX + padding, statY-3, iconSize);
+            DrawText(TextFormat("+%d", -def.atk), baseX + padding + iconSize + 4, statY, 32, WHITE);
+            statY += 36;
         }
-        if(def.hp==1) DrawText("Buff", baseX + padding, statY, 24, WHITE);
-        else if(def.hp > 0) {
-            DrawScaled(texHP, baseX + padding, statY, iconSize);
-            DrawText(TextFormat("%d", def.hp), baseX + padding + iconSize + 4, statY, 24, WHITE);
+        else {
+            statY = baseY + padding + portraitSize + 20;
+            statY += 36;
+            baseX += portraitSize/2 + 20;
         }
-            statY += 32;
             
         if(def.treasure > 0) {
-            DrawText("Win ", baseX + padding, statY, 24, GOLD);
-            baseX += 50;
             DrawScaled(texTR, baseX + padding, statY, iconSize);
-            DrawText(TextFormat("%d", def.treasure), baseX + padding + iconSize + 4, statY + 2, 24, GOLD);
-            baseX -= 50;
+            DrawText(TextFormat("+%d", def.treasure), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
         }
         if(def.food > 0) {
-            DrawText("Win ", baseX + padding, statY, 24, GOLD);
-            baseX += 50;
-            DrawScaled(texST, baseX + padding, statY, iconSize);
-            DrawText(TextFormat("%d", def.food), baseX + padding + iconSize + 4, statY + 2, 24, GOLD);
-            baseX -= 50;
+            DrawScaled(texST, baseX + padding, statY-5, iconSize);
+            DrawText(TextFormat("+%d", def.food), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
         }
         if(def.food < 0) {
-            DrawText("Win ", baseX + padding, statY, 24, GOLD);
-            baseX += 50;
-            DrawScaled(texATT, baseX + padding, statY, iconSize);
-            DrawText(TextFormat("%d", -def.food), baseX + padding + iconSize + 4, statY + 2, 24, GOLD);
-            baseX -= 50;
+            DrawScaled(texATT, baseX + padding, statY-5, iconSize);
+            DrawText(TextFormat("+%d", -def.food), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
         }
     }
     if(sirkcontrols)
