@@ -16,6 +16,7 @@
 #include <time.h>
 #include <math.h>
 #include <fstream>
+#include "httplib.h"
 
 #define GRID 8
 #define TILE 96
@@ -348,10 +349,44 @@ int loadHighScore() {
     return score;
 }
 
+
+inline bool submit_score(const std::string& server,
+                         const std::string& app_name,
+                         int                score,
+                         const std::string& data = "anonymous") {
+    std::string url = "/" + app_name + "/submit";
+    std::ostringstream json;
+    json << R"({"score":)" << score << R"(,"data":")" << data << R"("})";
+    const std::string payload = json.str();
+    httplib::Client cli(server.c_str());
+    cli.set_connection_timeout(3);
+    cli.set_read_timeout(5);
+    cli.set_write_timeout(5);
+    httplib::Headers headers{ {"Content-Type", "application/json"},};
+    auto res = cli.Post(url.c_str(), headers, payload, "application/json");
+    if (!res) {
+        std::cerr << "Network error: " << httplib::to_string(res.error()) << '\n';
+        return false;
+    }
+    if (res->status == 201) {
+        std::cout << "Score accepted (201 Created)\n";
+        return true;
+    }
+    else if (res->status == 409) {
+        std::cout << "Score not high enough for top 50 (409 Conflict)\n";
+    }
+    else {
+        std::cout << "Unexpected HTTP status: " << res->status << '\n';
+        std::cout << "Body: " << res->body << '\n';
+    }
+    return false;
+}
+
 void saveHighScore(int score) {
     std::ofstream file("sirk.dat", std::ios::trunc);
     if (file.is_open())
         file << score;
+    submit_score("http://maniospas.pythonanywhere.com", "sirk", score);
 }
 
 
@@ -569,7 +604,7 @@ void DrawGame() {
             DrawText("ENTER", baseX + PREVIEW_SIZE/2 - MeasureText("ENTER", 32)/2, baseY - 24, 32, YELLOW);
             const char* line1 = "";
             const char* line2 = "Buy for";
-            const char* line3 = TextFormat("%d", (i+1));
+            const char* line3 = TextFormat("%d", 2);
             int centerX = baseX + PREVIEW_SIZE/2;
             int textY   = baseY + PREVIEW_SIZE/2 - 70;
             int w1 = MeasureText(line1, 32);
@@ -661,12 +696,12 @@ void HandlePressureSpawn() {
         for(int tries = 0; tries < 1000; tries++) {
             EnemyType roll = static_cast<EnemyType>(GetRandomValue(0, ENEMY_NONE - 1));
             bool inHand = false;
-            if(luckcontrols)
-                for(int h = 0; h < HAND_SIZE; h++)
-                    if(hand[h] == roll) {
-                        inHand = true;
-                        break;
-                    }
+            // if(luckcontrols)
+            //     for(int h = 0; h < HAND_SIZE; h++)
+            //         if(hand[h] == roll) {
+            //             inHand = true;
+            //             break;
+            //         }
             if(!inHand) {
                 enemies[enemyCount] = MakeEnemy(roll, x, y);
                 if(!luckcontrols) break; // if we don't control luck, pretend that it's uniformly random
@@ -677,6 +712,19 @@ void HandlePressureSpawn() {
         enemyCount++;
     }
     spaceCounter = 0;
+}
+
+void HandlePressureSpawnTest() {
+    if(spaceCounter==MAX_PASS_COUNTER-1 && luckcontrols) interruptMessage = "Spawn...";
+    if(spaceCounter < MAX_PASS_COUNTER) return;
+
+    PlaceEnemyFromHand(0);
+    for (int i = 0; i < HAND_SIZE; i++) {
+        if(hand[i]!=ENEMY_NONE) continue;
+        hand[i] = RandomEnemyType();
+        break;
+    }
+
 }
 
 void ResetGame() {
@@ -760,7 +808,7 @@ int main() {
         }
         else 
         {   
-            autoturn += dt*(2+player.fun*0.1);
+            //autoturn += dt*(2+player.fun*0.1);
             if (sirkcontrols && IsKeyPressed(KEY_W)) {
                 interruptMessage = nullptr;
                 TryPlayerMove(0, -1);
@@ -793,18 +841,18 @@ int main() {
                 HandlePressureSpawn();
                 autoturn = 0;
             }
-            // else if (luckcontrols && IsKeyPressed(KEY_SPACE)) {
-            //     interruptMessage = nullptr;
-            //     PlayerAutoTurn();
-            //     EnemyTurn();
-            //     spaceCounter++;
-            //     HandlePressureSpawn();
-            //     autoturn = 0;
-            // }
+            else if (luckcontrols && IsKeyPressed(KEY_SPACE)) {
+                interruptMessage = nullptr;
+                PlayerAutoTurn();
+                EnemyTurn();
+                spaceCounter++;
+                HandlePressureSpawn();
+                autoturn = 0;
+            }
             else if (luckcontrols && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
                 for (int i = 0; i < HAND_SIZE; i++) {
                     if (hand[i] == ENEMY_NONE) {
-                        int cost = (i+1);
+                        int cost = 2;//(i+1);
                         if (player.treasure >= cost) {
                             player.treasure -= cost;
                             hand[i] = RandomEnemyType();

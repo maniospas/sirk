@@ -3,5 +3,6 @@ No attribution is required, but would be appreciated.
 Image license found in: [images/LICENSE.txt](images/LICENSE.txt)
 
 Fonts are governed by OFL - copy found in: [fonts/LICENSE.txt](fonts/LICENSE.txt)
+Httplib is governed by its own MIT license.
 
 Code in [main.cpp](main.cpp) is released under APACHE 2.0 license that it contained therein.
