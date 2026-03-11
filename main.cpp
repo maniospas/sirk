@@ -22,6 +22,9 @@
 #endif
 
 #include "raylib.h"
+#if defined(_WIN32)
+#undef DrawText
+#endif
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
@@ -70,7 +73,7 @@ typedef struct {
     bool active;
     bool isPlayer;
 } DamageEvent;
-#define DrawText(text, posX, posY, fontSize, color) DrawTextEx(gameFont, text, (Vector2){(float)(posX), (float)(posY)}, (float)(fontSize), 2, color)
+#define KDrawText(text, posX, posY, fontSize, color) DrawTextEx(gameFont, text, (Vector2){(float)(posX), (float)(posY)}, (float)(fontSize), 2, color)
 #define MeasureText(text, fontSize) MeasureTextEx(gameFont, text, (float)(fontSize), 2).x
 DamageEvent damageEvents[MAX_DAMAGE_EVENTS];
 
@@ -485,11 +488,11 @@ void PlaceEnemyFromHand(int slot) {
 
 void DrawStat(Texture2D icon, const char *title, const char *value, int x, int y, int iconOffset) {
     int iconSize = 42;
-    //DrawText(title, x, y+4, 24, WHITE);
+    //KDrawText(title, x, y+4, 24, WHITE);
     //y += 24;
     y += 12;
     DrawScaled(icon, x, y+iconOffset, iconSize);
-    DrawText(value, x + iconSize + 10, y + iconSize / 8, 32, WHITE);
+    KDrawText(value, x + iconSize + 10, y + iconSize / 8, 32, WHITE);
 }
 
 void DrawGame() {
@@ -591,9 +594,9 @@ void DrawGame() {
         py -= progress * 40.0f+20;
         float alpha = damageEvents[i].timer / DAMAGE_LINGER_DURATION;
         if(damageEvents[i].amount > 0)
-            DrawText(TextFormat("%d", -damageEvents[i].amount), px - 12, py, 38, Fade((Color){120, 0, 0, 255}, alpha));
+            KDrawText(TextFormat("%d", -damageEvents[i].amount), px - 12, py, 38, Fade((Color){120, 0, 0, 255}, alpha));
         else
-            DrawText(TextFormat("+%d", damageEvents[i].amount), px - 12, py, 38, Fade((Color){0, 120, 0, 255}, alpha));
+            KDrawText(TextFormat("+%d", damageEvents[i].amount), px - 12, py, 38, Fade((Color){0, 120, 0, 255}, alpha));
     }
     // terrain front
     for (int y = 0; y < GRID; y++)
@@ -602,7 +605,7 @@ void DrawGame() {
     // luck controls
     DrawRectangle(0, STATUS_BAR_SIZE + GRID * TILE, GRID * TILE, 2 * PREVIEW_SIZE + 80, DARKGRAY);
     if(!luckcontrols) {
-        DrawText("WASD to move.", 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
+        KDrawText("WASD to move.", 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
         return;
     }
     for (int i = 0; i < HAND_SIZE; i++) {
@@ -611,7 +614,7 @@ void DrawGame() {
         int padding = 8;
         DrawScaledDistorted(texCard, baseX, baseY+10, PREVIEW_SIZE, PREVIEW_SIZE*3/2);
         if(hand[i] == ENEMY_NONE) {
-            DrawText("ENTER", baseX + PREVIEW_SIZE/2 - MeasureText("ENTER", 32)/2, baseY - 24, 32, YELLOW);
+            KDrawText("ENTER", baseX + PREVIEW_SIZE/2 - MeasureText("ENTER", 32)/2, baseY - 24, 32, YELLOW);
             const char* line1 = "";
             const char* line2 = "Buy for";
             const char* line3 = TextFormat("%d", 2);
@@ -620,35 +623,35 @@ void DrawGame() {
             int w1 = MeasureText(line1, 32);
             int w2 = MeasureText(line2, 32);
             int w3 = MeasureText(line3, 32);
-            DrawText(line1, centerX - w1/2, textY, 32, YELLOW);
-            DrawText(line2, centerX - w2/2, textY + 34, 32, WHITE);
+            KDrawText(line1, centerX - w1/2, textY, 32, YELLOW);
+            KDrawText(line2, centerX - w2/2, textY + 34, 32, WHITE);
             int iconSize = 32;
             int totalWidth = iconSize + 6 + w3;
             int startX = centerX - totalWidth/2;
             DrawScaled(texTR, startX, textY + 64, iconSize);
-            DrawText(line3, startX + iconSize + 6, textY + 64, 32, GOLD);
+            KDrawText(line3, startX + iconSize + 6, textY + 64, 32, GOLD);
             break;
         }
         Enemy def = enemyTemplates[hand[i]];
         int portraitSize = PREVIEW_SIZE - padding*8;
         DrawScaled(GetEnemyTexture(hand[i]), baseX + padding*4, baseY + padding*4, portraitSize);
-        DrawText(TextFormat("%d: spawn", i+1), baseX + padding+5, baseY - 24, 32, YELLOW);
+        KDrawText(TextFormat("%d: spawn", i+1), baseX + padding+5, baseY - 24, 32, YELLOW);
         int statY = baseY + padding + portraitSize + 20;
         baseX += 8;
         int iconSize = 34;
         statY += 36;
         padding -= 5;
         if(def.hp==1) {
-            //DrawText("Buff", baseX + padding, statY, 32, WHITE);
+            //KDrawText("Buff", baseX + padding, statY, 32, WHITE);
         }
         else if(def.hp > 0) {
             DrawScaled(texHP, baseX + padding, statY-5, iconSize);
-            DrawText(TextFormat("%d", def.hp), baseX + padding + iconSize + 4, statY, 32, WHITE);
+            KDrawText(TextFormat("%d", def.hp), baseX + padding + iconSize + 4, statY, 32, WHITE);
             statY += 36;
         }
         if(def.atk > 0) {
             DrawScaled(texATT, baseX + padding, statY-5, iconSize);
-            DrawText(TextFormat("%d", def.atk), baseX + padding + iconSize + 4, statY, 32, WHITE);
+            KDrawText(TextFormat("%d", def.atk), baseX + padding + iconSize + 4, statY, 32, WHITE);
 
             statY = baseY + padding + portraitSize + 20;
             baseX += portraitSize/2 + 20;
@@ -659,7 +662,7 @@ void DrawGame() {
             statY += 36;
             baseX += portraitSize/2 + 20;
             DrawScaled(texHP, baseX + padding, statY-3, iconSize);
-            DrawText(TextFormat("+%d", -def.atk), baseX + padding + iconSize + 4, statY, 32, WHITE);
+            KDrawText(TextFormat("+%d", -def.atk), baseX + padding + iconSize + 4, statY, 32, WHITE);
             statY += 36;
         }
         else {
@@ -670,22 +673,22 @@ void DrawGame() {
             
         if(def.treasure > 0) {
             DrawScaled(texTR, baseX + padding, statY, iconSize);
-            DrawText(TextFormat("+%d", def.treasure), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
+            KDrawText(TextFormat("+%d", def.treasure), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
         }
         if(def.food > 0) {
             DrawScaled(texST, baseX + padding, statY-5, iconSize);
-            DrawText(TextFormat("+%d", def.food), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
+            KDrawText(TextFormat("+%d", def.food), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
         }
         if(def.food < 0) {
             DrawScaled(texATT, baseX + padding, statY-5, iconSize);
-            DrawText(TextFormat("+%d", -def.food), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
+            KDrawText(TextFormat("+%d", -def.food), baseX + padding + iconSize + 4, statY + 2, 32, WHITE);
         }
     }
     if(sirkcontrols)
-        DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"WASD to move. SPACE to automove.":TextFormat("WASD to move. SPACE to automove.", MAX_PASS_COUNTER-spaceCounter),
+        KDrawText(spaceCounter>=MAX_PASS_COUNTER-1?"WASD to move. SPACE to automove.":TextFormat("WASD to move. SPACE to automove.", MAX_PASS_COUNTER-spaceCounter),
                 24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
     // else
-    //     DrawText(spaceCounter>=MAX_PASS_COUNTER-1?"Sir K prioritizes buffs.":TextFormat("Sir K prioritizes buffs.", MAX_PASS_COUNTER-spaceCounter),
+    //     KDrawText(spaceCounter>=MAX_PASS_COUNTER-1?"Sir K prioritizes buffs.":TextFormat("Sir K prioritizes buffs.", MAX_PASS_COUNTER-spaceCounter),
     //             24, GRID * TILE + STATUS_BAR_SIZE + 10, 24, YELLOW);
 }
 
@@ -933,10 +936,10 @@ int main() {
             int titleSize = 80;
             int promptSize = 32;
             int smallSize = 22;
-            DrawText("SIR K'S FUNTIME", screenW/2 - MeasureText("SIR K'S FUNTIME", titleSize)/2, screenH/2 - 200, titleSize, WHITE);
-            DrawText("Sir K is bored. He jumps into the arena", screenW/2 - MeasureText("Sir K is bored. He jumps into the arena.", promptSize)/2, screenH/2 + 130, promptSize, Fade(WHITE, 0.8));
-            DrawText("for some fun. What do you control?", screenW/2 - MeasureText("Sir K is bored. He jumps into the arena.", promptSize)/2, screenH/2 + 170, promptSize, Fade(WHITE, 0.8));
-            DrawText("AD to change option, SPACE to start", screenW/2 - MeasureText("AD to change option, SPACE to start", smallSize)/2, screenH/2 + 300, smallSize, Fade(YELLOW, 0.8));
+            KDrawText("SIR K'S FUNTIME", screenW/2 - MeasureText("SIR K'S FUNTIME", titleSize)/2, screenH/2 - 200, titleSize, WHITE);
+            KDrawText("Sir K is bored. He jumps into the arena", screenW/2 - MeasureText("Sir K is bored. He jumps into the arena.", promptSize)/2, screenH/2 + 130, promptSize, Fade(WHITE, 0.8));
+            KDrawText("for some fun. What do you control?", screenW/2 - MeasureText("Sir K is bored. He jumps into the arena.", promptSize)/2, screenH/2 + 170, promptSize, Fade(WHITE, 0.8));
+            KDrawText("AD to change option, SPACE to start", screenW/2 - MeasureText("AD to change option, SPACE to start", smallSize)/2, screenH/2 + 300, smallSize, Fade(YELLOW, 0.8));
             const char* opt1 = "Sir K";
             const char* opt2 = "The arena";
             const char* opt3 = "Both";
@@ -944,9 +947,9 @@ int main() {
             Color c1 = (sirkcontrols && !luckcontrols) ? Fade(WHITE, 0.6f + 0.4f*pulse) : Fade(GRAY, 0.7f);
             Color c2 = (!sirkcontrols && luckcontrols) ? Fade(WHITE, 0.6f + 0.4f*pulse) : Fade(GRAY, 0.7f);
             Color c3 = (sirkcontrols && luckcontrols) ? Fade(WHITE, 0.6f + 0.4f*pulse) : Fade(GRAY, 0.7f);
-            DrawText(opt1, screenW/2 - MeasureText(opt1, promptSize)/2-140, screenH/2 + 260, promptSize, c1);
-            DrawText(opt2, screenW/2 - MeasureText(opt2, promptSize)/2, screenH/2 + 260, promptSize, c2);
-            DrawText(opt3, screenW/2 - MeasureText(opt3, promptSize)/2+140, screenH/2 + 260, promptSize, c3);
+            KDrawText(opt1, screenW/2 - MeasureText(opt1, promptSize)/2-140, screenH/2 + 260, promptSize, c1);
+            KDrawText(opt2, screenW/2 - MeasureText(opt2, promptSize)/2, screenH/2 + 260, promptSize, c2);
+            KDrawText(opt3, screenW/2 - MeasureText(opt3, promptSize)/2+140, screenH/2 + 260, promptSize, c3);
             int iconSize = 96;
             int spacing = 0;
             Texture2D icons[4] = { texPlayer, texATT, texTroll };
@@ -984,14 +987,14 @@ int main() {
             int panelY = (screenH - panelH) / 2-150;
             DrawRectangleRounded((Rectangle){(float)panelX, (float)panelY, (float)panelW, (float)panelH}, 0.2f, 12, DARKGRAY);
             DrawRectangleRoundedLines((Rectangle){(float)panelX, (float)panelY, (float)panelW, (float)panelH}, 0.2f, 12, player.fun>=highScore ? GREEN : RED);
-            DrawText(msg, panelX + (panelW - textW) / 2, panelY + (panelH - textH) / 2, fontSize, player.fun>=highScore ? GREEN : RED);
+            KDrawText(msg, panelX + (panelW - textW) / 2, panelY + (panelH - textH) / 2, fontSize, player.fun>=highScore ? GREEN : RED);
 
             int subFont = 64;
             const char* hsMsg;
             if (player.fun>=highScore) hsMsg = "HIGH SCORE!";
             else hsMsg = TextFormat("MOST FUN: %d", highScore);
             int hsW = MeasureText(hsMsg, subFont);
-            DrawText(hsMsg,
+            KDrawText(hsMsg,
                      panelX + (panelW - hsW) / 2,
                      panelY + (panelH - textH) / 2 + textH*3/4-20,
                      subFont,
@@ -1009,7 +1012,7 @@ int main() {
             int panelH = textH + panelPadding * 2;
             int panelX = (screenW - panelW) / 2;
             int panelY = (screenH - panelH) / 2;
-            DrawText(interruptMessage, panelX + (panelW - textW) / 2, panelY + (panelH - textH) / 2-150, fontSize, YELLOW);
+            KDrawText(interruptMessage, panelX + (panelW - textW) / 2, panelY + (panelH - textH) / 2-150, fontSize, YELLOW);
         }
         EndDrawing();
     }
