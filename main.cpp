@@ -25,6 +25,13 @@
 #if defined(_WIN32)
 #undef DrawText
 #endif
+static inline void raylib_DrawTextEx(Font font, const char *text,
+                                     Vector2 pos, float size,
+                                     float spacing, Color tint)
+{
+    DrawTextEx(font, text, pos, size, spacing, tint);
+}
+static inline void raylib_CloseWindow(void) { CloseWindow(); }
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
@@ -73,7 +80,7 @@ typedef struct {
     bool active;
     bool isPlayer;
 } DamageEvent;
-#define KDrawText(text, posX, posY, fontSize, color) DrawTextEx(gameFont, text, (Vector2){(float)(posX), (float)(posY)}, (float)(fontSize), 2, color)
+#define KDrawText(text, posX, posY, fontSize, color) raylib_DrawTextEx(gameFont, text, (Vector2){(float)(posX), (float)(posY)}, (float)(fontSize), 2, color)
 #define MeasureText(text, fontSize) MeasureTextEx(gameFont, text, (float)(fontSize), 2).x
 DamageEvent damageEvents[MAX_DAMAGE_EVENTS];
 
@@ -1016,6 +1023,6 @@ int main() {
         }
         EndDrawing();
     }
-    CloseWindow();
+    raylib_CloseWindow();
     return 0;
 }
