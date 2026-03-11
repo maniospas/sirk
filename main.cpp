@@ -10,11 +10,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#ifndef _WINSOCKAPI_          // make sure windows.h skips winsock.h
+#define _WINSOCKAPI_
+#endif
+#endif
 
 #include "raylib.h"
-#include <stdlib.h>
-#include <time.h>
-#include <math.h>
+#include <cstdlib>
+#include <ctime>
+#include <cmath>
 #include <fstream>
 #include "httplib.h"
 
